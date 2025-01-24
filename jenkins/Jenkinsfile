@@ -33,11 +33,11 @@ node {
         }
 
         // Run the app containerized via Docker on the EC2 instance
-        sshagent(['2871a697-ac36-44dc-95d6-331bbc119c6e']) {
+        sshagent(['Add2Val-Instance-Key']) {
             sh '''
-                ssh -o StrictHostKeyChecking=no ec2-user@13.213.11.105 << EOF
+                ssh -o StrictHostKeyChecking=no ec2-user@52.77.247.20 << EOF
                     docker run --rm --name add2vals-app -d -v $(pwd)/dist:/app -w /app python:2-alpine python add2vals.py
-                    echo "Container is running on EC2 instance at 13.213.11.105"
+                    echo "Container is running on EC2 instance at 52.77.247.20"
                 EOF
             '''
         }
