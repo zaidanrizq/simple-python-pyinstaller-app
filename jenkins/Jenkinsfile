@@ -20,8 +20,8 @@ node {
         input message: 'Lanjutkan ke tahap Deploy?'
     }
 
-    stage('Deliver') {
-        docker.image('python:2-alpine').inside("--entrypoint=''") { 
+    stage('Deploy') {
+        docker.image('python:2-alpine').inside("--entrypoint='' -u root") { 
             sh '''
                 # Install pip if not already available
                 apk add --no-cache py-pip
