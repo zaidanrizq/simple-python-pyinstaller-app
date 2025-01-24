@@ -21,18 +21,24 @@ node {
     }
 
     stage('Deploy') {
-        docker.image('python:2-alpine').inside("--entrypoint='' -u root") { 
-            sh '''
-                # Install pip if not already available
-                apk add --no-cache py-pip
-
-                # Install pyinstaller compatible with Python 2
-                pip install pyinstaller==3.6
-
-                # Run pyinstaller to create the binary
-                pyinstaller --onefile sources/add2vals.py
-            '''
+        stage(Build Docker Image) {
+            sh 'docker build -t add2vals-python-app:latest .'
         }
-        archiveArtifacts artifacts: 'dist/add2vals', onlyIfSuccessful: true
+
+        stage('Deploy to EC2 App Server') {
+            withCredentials([sshUserPrivateKey(credentialsId: 'Add2Val-Instance-Key', keyFileVariable: 'SSH_KEY')]) {
+                ssh '''
+                    scp -i $SSH_KEY add2vals-python-app.tar ec2-user@52.77.247.20:/tmp
+                    ssh -i $SSH_KEY ec2-user@52.77.247.20 << EOF
+                    docker load < /tmp/add2vals-python-app.tar
+                    docker run -d --name add2vals-python-app -p 8080:8080 add2vals-python-app:latest
+                    EOF
+                '''
+            }
+        }
+
+        stage('Wait After Deployment Success') {
+            sh 'sleep 60'
+        }
     }
 }
