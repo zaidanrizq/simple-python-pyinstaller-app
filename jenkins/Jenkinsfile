@@ -23,6 +23,7 @@ node {
     stage('Deploy') {
         stage('Build Docker Image') {
             sh 'docker build -t add2vals-python-app:latest .'
+            sh 'docker save -o add2vals-python-app.tar add2vals-python-app:latest'
         }
 
         stage('Deploy to EC2 App Server') {
