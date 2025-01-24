@@ -10,9 +10,8 @@ node {
     }
 
     stage('Test') {
-        docker.image('python:3.10-alpine').inside {
+        docker.image('qnib/pytest').inside {
             try {
-                sh 'pip install pytest' // Ensure pytest is available
                 sh 'pytest --verbose --junit-xml test-reports/results.xml sources/test_calc.py'
             } finally {
                 junit 'test-reports/results.xml'
@@ -21,7 +20,7 @@ node {
     }
 
     stage('Manual Approval') {
-        input message: 'Lanjutkan ke tahap Deploy? (Proceed or Abort)'
+        input message: 'Lanjutkan ke tahap Deploy? (Proceed untuk melanjutkan eksekusi pipeline ke tahap Deploy)'
     }
 
     stage('Deploy') {
