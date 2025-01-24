@@ -20,11 +20,11 @@ node {
     }
 
     stage('Manual Approval') {
-        input message: 'Lanjutkan ke tahap Deploy? (Proceed or Abort)'
+        input message: 'Lanjutkan ke tahap Deploy? (Proceed untuk melanjutkan eksekusi pipeline ke tahap Deploy)'
     }
 
     stage('Deploy') {
-        docker.image('cdrx/pyinstaller-linux:python3.10').inside {
+        docker.image('cdrx/pyinstaller-linux:python3').inside {
             try {
                 sh 'pyinstaller --onefile sources/add2vals.py'
             } finally {
