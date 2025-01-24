@@ -1,60 +1,29 @@
 node {
-    checkout scm
+    stage('Checkout SCM') {
+        checkout scm
+    }
+
     stage('Build') {
         docker.image('python:2-alpine').inside {
-            sh "python -m py_compile sources/add2vals.py sources/calc.py"
-            stash(name: 'compiled-results', includes: 'sources/*.py*')
+            sh 'python -m py_compile sources/add2vals.py sources/calc.py'
         }
     }
+
     stage('Test') {
         docker.image('qnib/pytest').inside {
-            try {
-                sh "py.test --verbose --junit-xml test-reports/results.xml sources/test_calc.py"
-            } finally {
-                junit 'test-reports/results.xml'
-            }
+            sh 'py.test --verbose --junit-xml test-reports/results.xml sources/test_calc.py'
+            junit 'test-reports/results.xml'
         }
     }
+
     stage('Manual Approval') {
         input message: 'Lanjutkan ke tahap Deploy?'
     }
 
-    stage('Deploy') {
-        withEnv(['IMAGE=cdrx/pyinstaller-linux:python2']) {
-            try {
-                dir(path: env.BUILD_ID) {
-                    unstash(name: 'compiled-results')
-		    sh "docker run --rm -v \$(pwd)/sources:/src ${IMAGE} pyinstaller -F sources/add2vals.py --distpath /src/dist"
-                }
-                archiveArtifacts "${env.BUILD_ID}/sources/dist/add2vals"
-                sh "docker run --rm -v \$(pwd)/sources:/src ${IMAGE} rm -rf build dist"
-
-                // Define EC2 details
-                def EC2_HOST = "52.77.247.20"
-                def CREDENTIAL_ID = "Add2Val-Instance-Key"
-                def CONTAINER_NAME = "Add2Val-Pyton-App"
-
-                // Use Jenkins SSH credentials
-                sshagent([CREDENTIAL_ID]) {
-                    // Save the Docker image as a tar file
-                    sh "docker commit \$(docker ps -q --filter 'name=${CONTAINER_NAME}') ${CONTAINER_NAME}:latest"
-                    sh "docker save ${CONTAINER_NAME}:latest -o ${CONTAINER_NAME}.tar"
-
-                    // Transfer the tar file to the EC2 instance
-                    sh "scp -o StrictHostKeyChecking=no ${CONTAINER_NAME}.tar ${EC2_HOST}:/home/ec2-user/"
-
-                    // Load and run the container on the EC2 instance
-                    sh """
-                    ssh -o StrictHostKeyChecking=no ${EC2_HOST} << EOF
-                    docker load -i /home/ec2-user/${CONTAINER_NAME}.tar
-                    docker run -d --name ${CONTAINER_NAME} ${CONTAINER_NAME}:latest
-                    EOF
-                    """
-                }
-
-            } catch (e) {
-                error "Deployment failed: ${e.message}"
-            }
+    stage('Deliver') {
+        docker.image('cdrx/pyinstaller-linux:python2').inside {
+            sh 'pyinstaller --onefile sources/add2vals.py'
         }
+        archiveArtifacts artifacts: 'dist/add2vals', onlyIfSuccessful: true
     }
 }
