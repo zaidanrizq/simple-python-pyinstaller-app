@@ -4,7 +4,7 @@ node {
             sh 'python -m py_compile sources/add2vals.py sources/calc.py'
         }
     }
-    
+
     stage('Test') {
         docker.image('qnib/pytest').inside {
             try {
@@ -13,5 +13,31 @@ node {
                 junit 'test-reports/results.xml'
             }
         }
+    }
+
+    stage('Manual Approval') {
+        input message: 'Lanjutkan ke tahap Deploy? (Proceed or Abort)'
+    }
+
+    stage('Deploy') {
+        docker.image('cdrx/pyinstaller-linux:python2').inside {
+            try {
+                sh 'pyinstaller --onefile sources/add2vals.py'
+            } finally {
+                archiveArtifacts artifacts: 'dist/add2vals', allowEmptyArchive: false
+            }
+        }
+
+        // Run the app containerized via Docker on the EC2 instance
+        sshagent(['2871a697-ac36-44dc-95d6-331bbc119c6e']) {
+            sh '''
+                ssh -o StrictHostKeyChecking=no ec2-user@13.213.11.105 << EOF
+                    docker run --rm --name add2vals-app -d -v $(pwd)/dist:/app -w /app python:2-alpine python add2vals.py
+                    echo "Container is running on EC2 instance at 13.213.11.105"
+                EOF
+            '''
+        }
+
+        sleep time: 1, unit: 'MINUTES'
     }
 }
