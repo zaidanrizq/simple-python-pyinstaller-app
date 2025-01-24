@@ -31,10 +31,10 @@ node {
     		    pip install --no-cache-dir pyinstaller==3.6 --target=/tmp/pyinstaller
 
     		    echo "Updating PATH to include /tmp/pyinstaller..."
-    		    export PATH=$PATH:/tmp/pyinstaller
+    		    export PATH=$PATH:/tmp/pyinstaller/bin
 
     		    echo "Verifying PyInstaller installation..."
-    		    ls -la /tmp/pyinstaller
+    		    ls -la /tmp/pyinstaller/bin
     		    pyinstaller --version || (echo "PyInstaller not found in PATH!" && exit 1)
 
     		    echo "Running PyInstaller..."
