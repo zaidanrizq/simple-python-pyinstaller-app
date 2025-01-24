@@ -1,73 +1,71 @@
 node {
-    stage('Checkout') {
-        checkout scm
-    }
-
+    checkout scm
     stage('Build') {
         docker.image('python:2-alpine').inside {
-            sh 'python -m py_compile sources/add2vals.py sources/calc.py'
+            sh "python -m py_compile sources/add2vals.py sources/calc.py"
+            stash(name: 'compiled-results', includes: 'sources/*.py*')
         }
     }
-
     stage('Test') {
         docker.image('qnib/pytest').inside {
             try {
-                sh 'py.test --verbose --junit-xml test-reports/results.xml sources/test_calc.py'
+                sh "py.test --verbose --junit-xml test-reports/results.xml sources/test_calc.py"
             } finally {
                 junit 'test-reports/results.xml'
             }
         }
     }
-
     stage('Manual Approval') {
-        input message: 'Lanjutkan ke tahap Deploy? (Proceed untuk melanjutkan eksekusi pipeline ke tahap Deploy)'
+        input message: 'Lanjutkan ke tahap Deploy?'
     }
 
     stage('Deploy') {
-        docker.image('python:2-alpine').inside("--entrypoint=''") {
+        withEnv(['IMAGE=cdrx/pyinstaller-linux:python2']) {
             try {
-	        sh '''
-    		    echo "Installing PyInstaller..."
-    		    pip install --no-cache-dir pyinstaller==3.6 --target=/tmp/pyinstaller
+                dir(path: env.BUILD_ID) {
+                    unstash(name: 'compiled-results')
+                    sh "docker run --rm -v $(pwd)/sources:/src ${IMAGE} pyinstaller -F add2vals.py"
+                }
+                archiveArtifacts "${env.BUILD_ID}/sources/dist/add2vals"
+                sh "docker run --rm -v $(pwd)/sources:/src ${IMAGE} rm -rf build dist"
 
-    		    echo "Updating PATH to include /tmp/pyinstaller..."
-    		    export PYTHONPATH=$PYTHONPATH:/tmp/pyinstaller
-		    export PATH=$PATH:/tmp/pyinstaller/bin			
+                // Define EC2 details
+                def EC2_HOST = "52.77.247.20"
+                def CREDENTIAL_ID = "Add2Val-Instance-Key"
+                def CONTAINER_NAME = "Add2Val-Pyton-App"
 
-    		    echo "Verifying PyInstaller installation..."
-    		    ls -la /tmp/pyinstaller/bin
-    		    pyinstaller --version || (echo "PyInstaller not found in PATH!" && exit 1)
-		    
-		    echo "Checking sources..."
-		    ls -la sources/	
+                // Use Jenkins SSH credentials
+                sshagent([CREDENTIAL_ID]) {
+                    // Save the Docker image as a tar file
+                    sh "docker commit $(docker ps -q --filter 'name=${CONTAINER_NAME}') ${CONTAINER_NAME}:latest"
+                    sh "docker save ${CONTAINER_NAME}:latest -o ${CONTAINER_NAME}.tar"
 
-		    echo "Checking permissions for workspace:"
-		    ls -ld $(pwd)	    
+                    // Transfer the tar file to the EC2 instance
+                    sh "scp -o StrictHostKeyChecking=no ${CONTAINER_NAME}.tar ${EC2_HOST}:/home/ec2-user/"
 
-    		    echo "Running PyInstaller..."
-		    pyinstaller --onefile sources/add2vals.py --workpath=/tmp/build --distpath=/tmp/dist --specpath=/tmp/build
+                    // Load and run the container on the EC2 instance
+                    sh ""
+                    "
+                    ssh - o StrictHostKeyChecking = no $ {
+                        EC2_HOST
+                    } << EOF
+                    docker load - i / home / ec2 - user / $ {
+                        CONTAINER_NAME
+                    }.tar
+                    docker run - d--name $ {
+                        CONTAINER_NAME
+                    }
+                    $ {
+                        CONTAINER_NAME
+                    }: latest
+                    EOF
+                        ""
+                    "
+                }
 
-    		    echo "Checking for dist directory..."
-    		    ls -la dist/ || (echo "dist directory not found!" && exit 1)
-		'''
-            } catch (Exception e) {
-                echo "Error: PyInstaller failed or dist directory not found!"
-		throw e
-            } finally {
-                archiveArtifacts artifacts: 'dist/add2vals', allowEmptyArchive: false
+            } catch (e) {
+                error "Deployment failed: ${e.message}"
             }
         }
-
-        // Run the app containerized via Docker on the EC2 instance
-        sshagent(['Add2Val-Instance-Key']) {
-            sh '''
-                ssh -o StrictHostKeyChecking=no ec2-user@52.77.247.20 << EOF
-                    docker run --rm --name add2vals-app -d -v $(pwd)/dist:/app -w /app python:2-alpine python add2vals.py
-                    echo "Container is running on EC2 instance at 52.77.247.20"
-                EOF
-            '''
-        }
-
-        sleep time: 1, unit: 'MINUTES'
     }
 }
