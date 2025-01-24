@@ -1,56 +1,50 @@
-node {
-    stage('Checkout') {
-        checkout scm
-    }
-
-    stage('Build') {
-        docker.image('python:3.10-alpine').inside {
-            sh 'python -m py_compile sources/add2vals.py sources/calc.py'
-        }
-    }
-
-    stage('Test') {
-        docker.image('qnib/pytest').inside {
-            try {
-                sh 'pytest --verbose --junit-xml test-reports/results.xml sources/test_calc.py'
-            } finally {
-                junit 'test-reports/results.xml'
+pipeline {
+    agent none
+    stages {
+	stage('Checkout') {
+	    steps {
+	        checkout scm
+	    }
+	}
+        stage('Build') {
+            agent {
+                docker {
+                    image 'python:2-alpine'
+                }
+            }
+            steps {
+                sh 'python -m py_compile sources/add2vals.py sources/calc.py'
             }
         }
-    }
-
-    stage('Manual Approval') {
-        input message: 'Lanjutkan ke tahap Deploy? (Proceed untuk melanjutkan eksekusi pipeline ke tahap Deploy)'
-    }
-
-    stage('Deploy') {
-        docker.image('python:3.10-alpine').inside {
-            try {
-                // Install required dependencies for PyInstaller
-                sh '''
-                    apk add --no-cache gcc musl-dev libffi-dev python3-dev
-                    pip install pyinstaller
-                '''
-                
-                // Compile the Python script into a standalone executable
+        stage('Test') {
+            agent {
+                docker {
+                    image 'qnib/pytest'
+                }
+            }
+            steps {
+                sh 'py.test --verbose --junit-xml test-reports/results.xml sources/test_calc.py'
+            }
+            post {
+                always {
+                    junit 'test-reports/results.xml'
+                }
+            }
+        }
+        stage('Deploy') {
+            agent {
+                docker {
+                    image 'cdrx/pyinstaller-linux:python2'
+                }
+            }
+            steps {
                 sh 'pyinstaller --onefile sources/add2vals.py'
-                
-                // Verify the artifact
-                sh 'ls -la dist/'
-            } finally {
-                archiveArtifacts artifacts: 'dist/add2vals', allowEmptyArchive: false
+            }
+            post {
+                success {
+                    archiveArtifacts 'dist/add2vals'
+                }
             }
         }
-
-        sshagent(['Add2Val-Instance-Key']) {
-            sh '''
-                ssh -o StrictHostKeyChecking=no ec2-user@52.77.247.20 << EOF
-                    docker run --rm --name add2vals-app -d -v $(pwd)/dist:/app -w /app python:3.10-alpine python add2vals.py
-                    echo "Container is running on EC2 instance at 52.77.247.20"
-                EOF
-            '''
-        }
-
-        sleep time: 1, unit: 'MINUTES'
     }
 }
