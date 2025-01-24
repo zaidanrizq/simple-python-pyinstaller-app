@@ -28,7 +28,7 @@ node {
             try {
                 sh '''
 		    echo "Installing PyInstaller..."
-		    pip install --no-cache-dir pyinstaller==3.6 --user
+		    pip install --no-cache-dir -Iv --user pyinstaller==3.6
 		    
 		    echo "Updating PATH to include user-installed packages..."
 		    export PATH=$PATH:~/.local/bin
