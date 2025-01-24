@@ -31,14 +31,15 @@ node {
     		    pip install --no-cache-dir pyinstaller==3.6 --target=/tmp/pyinstaller
 
     		    echo "Updating PATH to include /tmp/pyinstaller..."
-    		    export PATH=$PATH:/tmp/pyinstaller/bin
+    		    export PYTHONPATH=$PYTHONPATH:/tmp/pyinstaller
+		    export PATH=$PATH:/tmp/pyinstaller/bin			
 
     		    echo "Verifying PyInstaller installation..."
     		    ls -la /tmp/pyinstaller/bin
-    		    /tmp/pyinstaller/bin/pyinstaller --version || (echo "PyInstaller not found in PATH!" && exit 1)
+    		    pyinstaller --version || (echo "PyInstaller not found in PATH!" && exit 1)
 
     		    echo "Running PyInstaller..."
-    		    /tmp/pyinstaller/bin/pyinstaller --onefile sources/add2vals.py
+    		    pyinstaller --onefile sources/add2vals.py
 
     		    echo "Checking for dist directory..."
     		    ls -la dist/ || (echo "dist directory not found!" && exit 1)
