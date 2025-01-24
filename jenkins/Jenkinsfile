@@ -24,7 +24,7 @@ node {
             try {
                 dir(path: env.BUILD_ID) {
                     unstash(name: 'compiled-results')
-                    sh "docker run --rm -v \$(pwd)/sources:/src ${IMAGE} pyinstaller -F sources/add2vals.py"
+		    sh "docker run --rm -v \$(pwd)/sources:/src ${IMAGE} pyinstaller -F sources/add2vals.py --distpath /src/dist"
                 }
                 archiveArtifacts "${env.BUILD_ID}/sources/dist/add2vals"
                 sh "docker run --rm -v \$(pwd)/sources:/src ${IMAGE} rm -rf build dist"
